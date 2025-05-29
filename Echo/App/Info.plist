@@ -18,6 +18,24 @@
 				</dict>
 			</array>
 		</dict>
-	</dict>
+    </dict>
+
+    <!-- OAuth URL Scheme -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>echo-trakt</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Network Access -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+    </dict>
 </dict>
 </plist>

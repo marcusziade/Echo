@@ -11,10 +11,10 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		2CEECE3D2DE8F6E6002FF09F /* Exceptions for "Echo" folder in "Echo" target */ = {
+		2C600C152DE908080046C1B4 /* Exceptions for "Echo" folder in "Echo" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Info.plist,
+				App/Info.plist,
 			);
 			target = 2CEECE2A2DE8F6E5002FF09F /* Echo */;
 		};
@@ -24,7 +24,7 @@
 		2CEECE2D2DE8F6E5002FF09F /* Echo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				2CEECE3D2DE8F6E6002FF09F /* Exceptions for "Echo" folder in "Echo" target */,
+				2C600C152DE908080046C1B4 /* Exceptions for "Echo" folder in "Echo" target */,
 			);
 			path = Echo;
 			sourceTree = "<group>";
@@ -147,11 +147,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P4DQK6SRKR;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Echo/Info.plist;
+				INFOPLIST_FILE = Echo/App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Echo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UILaunchStoryboardName = Echo/Resources/LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
@@ -181,11 +181,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P4DQK6SRKR;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Echo/Info.plist;
+				INFOPLIST_FILE = Echo/App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Echo;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
+				INFOPLIST_KEY_UILaunchStoryboardName = Echo/Resources/LaunchScreen;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
