@@ -27,7 +27,6 @@ final class TraktAuthManager: NSObject {
         let pkce = PKCEParameters()
         currentPKCE = pkce
 
-        // Build authorization URL
         var components = URLComponents(string: "\(Constants.Trakt.authURL)/oauth/authorize")!
         components.queryItems = [
             URLQueryItem(name: "response_type", value: "code"),
@@ -41,7 +40,7 @@ final class TraktAuthManager: NSObject {
             throw TraktAuthError(
                 code: "invalid_url", description: "Failed to build authorization URL")
         }
-        
+
         print("Auth URL: \(authURL)")
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -126,21 +125,18 @@ final class TraktAuthManager: NSObject {
             throw TraktAuthError(code: "missing_pkce", description: "PKCE parameters not found")
         }
 
-        let url = URL(string: "\(Constants.Trakt.authURL)/oauth/token")!
+        let url = URL(string: "\(Constants.Trakt.workerURL)/oauth/token")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "code": code,
-            "client_id": Constants.Trakt.clientID,
-            "client_secret": Constants.Trakt.clientSecret,
             "redirect_uri": Constants.Trakt.redirectURI,
-            "grant_type": "authorization_code",
             "code_verifier": pkce.codeVerifier,
         ]
-        
-        print("Token exchange body: \(body)")
+
+        print("Token exchange request to Worker")
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
@@ -152,6 +148,7 @@ final class TraktAuthManager: NSObject {
 
         guard httpResponse.statusCode == 200 else {
             let errorMessage = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("Token exchange failed: \(httpResponse.statusCode) - \(errorMessage)")
             throw TraktAuthError(code: "token_exchange_failed", description: errorMessage)
         }
 
@@ -162,17 +159,14 @@ final class TraktAuthManager: NSObject {
     }
 
     private func refreshToken(_ refreshToken: String) async throws {
-        let url = URL(string: "\(Constants.Trakt.authURL)/oauth/token")!
+        let url = URL(string: "\(Constants.Trakt.workerURL)/oauth/refresh")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let body: [String: Any] = [
             "refresh_token": refreshToken,
-            "client_id": Constants.Trakt.clientID,
-            "client_secret": Constants.Trakt.clientSecret,
             "redirect_uri": Constants.Trakt.redirectURI,
-            "grant_type": "refresh_token",
         ]
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -186,7 +180,8 @@ final class TraktAuthManager: NSObject {
         guard httpResponse.statusCode == 200 else {
             // If refresh fails, clear tokens and require re-authentication
             try KeychainService.shared.clearTokens()
-            throw TraktAuthError(code: "refresh_failed", description: "Token refresh failed")
+            let errorMessage = String(data: data, encoding: .utf8) ?? "Token refresh failed"
+            throw TraktAuthError(code: "refresh_failed", description: errorMessage)
         }
 
         let tokenResponse = try JSONDecoder().decode(TraktTokenResponse.self, from: data)
@@ -206,10 +201,10 @@ extension TraktAuthManager: ASWebAuthenticationPresentationContextProviding {
             }
         }
     }
-    
+
     private func getPresentationAnchor() -> ASPresentationAnchor {
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first
+            let window = windowScene.windows.first
         else {
             fatalError("No window found")
         }
