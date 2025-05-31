@@ -37,6 +37,16 @@ final class TraktTestViewController: UIViewController {
         return button
     }()
 
+    private let testSyncButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Test Sync Manager", for: .normal)
+        button.backgroundColor = .systemPurple
+        button.setTitleColor(.white, for: .normal)
+        button.layer.cornerRadius = 8
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     private let outputTextView: UITextView = {
         let textView = UITextView()
         textView.isEditable = false
@@ -69,6 +79,7 @@ final class TraktTestViewController: UIViewController {
         contentView.addSubview(testSearchButton)
         contentView.addSubview(testTokenButton)
         contentView.addSubview(testDatabaseButton)
+        contentView.addSubview(testSyncButton)
         contentView.addSubview(outputTextView)
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(
@@ -114,8 +125,16 @@ final class TraktTestViewController: UIViewController {
                 equalTo: contentView.trailingAnchor, constant: -20),
             testDatabaseButton.heightAnchor.constraint(equalToConstant: 44),
 
+            testSyncButton.topAnchor.constraint(
+                equalTo: testDatabaseButton.bottomAnchor, constant: 12),
+            testSyncButton.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            testSyncButton.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
+            testSyncButton.heightAnchor.constraint(equalToConstant: 44),
+
             outputTextView.topAnchor.constraint(
-                equalTo: testDatabaseButton.bottomAnchor, constant: 20),
+                equalTo: testSyncButton.bottomAnchor, constant: 20),
             outputTextView.leadingAnchor.constraint(
                 equalTo: contentView.leadingAnchor, constant: 20),
             outputTextView.trailingAnchor.constraint(
@@ -130,34 +149,32 @@ final class TraktTestViewController: UIViewController {
         testSearchButton.addTarget(self, action: #selector(testSearch), for: .touchUpInside)
         testTokenButton.addTarget(self, action: #selector(testToken), for: .touchUpInside)
         testDatabaseButton.addTarget(self, action: #selector(testDatabase), for: .touchUpInside)
+        testSyncButton.addTarget(self, action: #selector(testSync), for: .touchUpInside)
     }
 
     // MARK: - Actions
     @objc private func testSearch() {
-        appendOutput("🔍 Testing Search API...\n")
+        appendOutput("🔍 Testing Search with Sync Manager...\n")
 
         Task {
             do {
-                // Test search for Breaking Bad
-                let results = try await TraktService.shared.searchShows(
-                    query: "Breaking Bad", limit: 3)
+                // Search and save shows using SyncManager
+                let shows = try await SyncManager.shared.searchAndSaveShows(
+                    query: "Breaking Bad",
+                    limit: 3
+                )
 
                 await MainActor.run {
-                    appendOutput("✅ Search successful! Found \(results.count) shows\n\n")
+                    appendOutput("✅ Search and save successful! Found \(shows.count) shows\n\n")
 
-                    for (index, show) in results.enumerated() {
+                    for (index, show) in shows.enumerated() {
                         appendOutput("Show \(index + 1):\n")
                         appendOutput("  Title: \(show.title)\n")
                         appendOutput("  Year: \(show.year ?? 0)\n")
-                        appendOutput("  Trakt ID: \(show.ids.trakt)\n")
+                        appendOutput("  Database ID: \(show.id ?? 0)\n")
+                        appendOutput("  Trakt ID: \(show.traktId)\n")
                         appendOutput("  Network: \(show.network ?? "N/A")\n")
-                        appendOutput("  Status: \(show.status ?? "N/A")\n")
-                        appendOutput("  Overview: \(show.overview?.prefix(100) ?? "N/A")...\n\n")
-                    }
-
-                    // Save first result to database
-                    if let firstShow = results.first {
-                        saveShowToDatabase(firstShow)
+                        appendOutput("  Status: \(show.status ?? "N/A")\n\n")
                     }
                 }
 
@@ -247,6 +264,100 @@ final class TraktTestViewController: UIViewController {
         }
     }
 
+    @objc private func testSync() {
+        appendOutput("🔄 Testing Complete Show Sync...\n")
+
+        Task {
+            do {
+                // First, get a show from the database
+                guard let db = DatabaseManager.shared.reader else {
+                    await MainActor.run {
+                        appendOutput("❌ Database not initialized\n")
+                    }
+                    return
+                }
+
+                let shows = try await db.read { db in
+                    try Show.fetchAll(db)
+                }
+
+                guard let firstShow = shows.first else {
+                    await MainActor.run {
+                        appendOutput("❌ No shows in database. Run search first!\n")
+                    }
+                    return
+                }
+
+                await MainActor.run {
+                    appendOutput("📺 Syncing: \(firstShow.title)\n")
+                    appendOutput("   Show ID: \(firstShow.id ?? 0)\n")
+                    appendOutput("   Trakt ID: \(firstShow.traktId)\n")
+                    appendOutput("   This may take a moment...\n\n")
+                }
+
+                // Sync the complete show
+                let syncedShow = try await SyncManager.shared.syncCompleteShow(showId: firstShow.id!)
+
+                // Get sync stats
+                let stats = try await SyncManager.shared.getSyncStats(for: syncedShow.id!)
+
+                await MainActor.run {
+                    appendOutput("✅ Sync completed!\n")
+                    appendOutput("\n📊 Sync Statistics:\n")
+                    appendOutput("  Total Episodes: \(stats.totalEpisodes)\n")
+                    appendOutput("  Aired Episodes: \(stats.airedEpisodes)\n")
+                    appendOutput("  Watched Episodes: \(stats.watchedEpisodes)\n")
+                    appendOutput("  Unwatched (Aired): \(stats.unwatchedAired)\n")
+                    appendOutput("  Watched %: \(String(format: "%.1f", stats.watchedPercentage))%\n")
+                }
+
+                // Now sync watched progress
+                await MainActor.run {
+                    appendOutput("\n🔄 Syncing watched progress...\n")
+                }
+
+                try await SyncManager.shared.syncWatchedProgress(showId: syncedShow.id!)
+
+                // Get updated stats
+                let updatedStats = try await SyncManager.shared.getSyncStats(for: syncedShow.id!)
+
+                await MainActor.run {
+                    appendOutput("✅ Watched progress synced!\n")
+                    appendOutput("\n📊 Updated Statistics:\n")
+                    appendOutput("  Watched Episodes: \(updatedStats.watchedEpisodes)\n")
+                    appendOutput("  Watched %: \(String(format: "%.1f", updatedStats.watchedPercentage))%\n")
+                }
+
+            } catch DecodingError.keyNotFound(let key, let context) {
+                await MainActor.run {
+                    appendOutput("❌ Decoding error - Missing key: \(key)\n")
+                    appendOutput("   Context: \(context.debugDescription)\n")
+                }
+            } catch DecodingError.typeMismatch(let type, let context) {
+                await MainActor.run {
+                    appendOutput("❌ Decoding error - Type mismatch: \(type)\n")
+                    appendOutput("   Context: \(context.debugDescription)\n")
+                }
+            } catch DecodingError.valueNotFound(let type, let context) {
+                await MainActor.run {
+                    appendOutput("❌ Decoding error - Value not found: \(type)\n")
+                    appendOutput("   Context: \(context.debugDescription)\n")
+                }
+            } catch DecodingError.dataCorrupted(let context) {
+                await MainActor.run {
+                    appendOutput("❌ Decoding error - Data corrupted\n")
+                    appendOutput("   Context: \(context.debugDescription)\n")
+                }
+            } catch {
+                await MainActor.run {
+                    appendOutput("❌ Sync failed: \(error.localizedDescription)\n")
+                    appendOutput("   Error type: \(type(of: error))\n")
+                    appendOutput("   Error details: \(error)\n")
+                }
+            }
+        }
+    }
+
     @objc private func clearOutput() {
         outputTextView.text = ""
     }
@@ -259,26 +370,6 @@ final class TraktTestViewController: UIViewController {
         if outputTextView.text.count > 0 {
             let bottom = NSMakeRange(outputTextView.text.count - 1, 1)
             outputTextView.scrollRangeToVisible(bottom)
-        }
-    }
-
-    private func saveShowToDatabase(_ traktShow: TraktShow) {
-        appendOutput("\n💾 Saving show to database...\n")
-
-        do {
-            try DatabaseManager.shared.writer?.write { db in
-                let show = traktShow.toShow()
-
-                // Check if show already exists
-                if let existingShow = try Show.findByTraktId(traktShow.ids.trakt, in: db) {
-                    appendOutput("ℹ️ Show already exists with ID: \(existingShow.id ?? 0)\n")
-                } else {
-                    try show.insert(db)
-                    appendOutput("✅ Show saved with ID: \(show.id ?? 0)\n")
-                }
-            }
-        } catch {
-            appendOutput("❌ Database save error: \(error.localizedDescription)\n")
         }
     }
 }

@@ -52,8 +52,15 @@ final class TraktService {
     /// Get all episodes for a season
     func getEpisodes(showId: String, season: Int) async throws -> [TraktEpisode] {
         let endpoint = "/shows/\(showId)/seasons/\(season)?extended=full"
-        let seasonData = try await apiClient.get(TraktSeason.self, endpoint: endpoint)
-        return seasonData.episodes ?? []
+
+        do {
+            // The API returns an array of episodes directly, not a season object
+            return try await apiClient.get([TraktEpisode].self, endpoint: endpoint)
+        } catch {
+            print("❌ Failed to get episodes for show \(showId) season \(season)")
+            print("   Error: \(error)")
+            throw error
+        }
     }
 
     // MARK: - Progress
