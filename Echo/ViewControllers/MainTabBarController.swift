@@ -29,7 +29,21 @@ final class MainTabBarController: UITabBarController {
             systemImage: "person.circle.fill"
         )
 
-        viewControllers = [upNextVC, searchVC, libraryVC, profileVC]
+        // Add test tab in DEBUG mode
+        #if DEBUG
+            let testVC = TraktTestViewController()
+            testVC.tabBarItem = UITabBarItem(
+                title: "Tests",
+                image: UIImage(systemName: "hammer"),
+                selectedImage: UIImage(systemName: "hammer.fill")
+            )
+            let testNavVC = UINavigationController(rootViewController: testVC)
+            testNavVC.navigationBar.prefersLargeTitles = true
+
+            viewControllers = [upNextVC, searchVC, libraryVC, profileVC, testNavVC]
+        #else
+            viewControllers = [upNextVC, searchVC, libraryVC, profileVC]
+        #endif
     }
 
     private func setupAppearance() {
