@@ -128,7 +128,7 @@ final class DatabaseManager {
                 }
 
                 // Create some episodes
-                var episode1 = Episode(
+                let episode1 = Episode(
                     showId: showId,
                     traktId: 73640,
                     season: 1,
@@ -140,7 +140,7 @@ final class DatabaseManager {
                     watchedAt: nil
                 )
 
-                var episode2 = Episode(
+                let episode2 = Episode(
                     showId: showId,
                     traktId: 73641,
                     season: 1,

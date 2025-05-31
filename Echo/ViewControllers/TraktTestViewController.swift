@@ -267,7 +267,7 @@ final class TraktTestViewController: UIViewController {
 
         do {
             try DatabaseManager.shared.writer?.write { db in
-                var show = traktShow.toShow()
+                let show = traktShow.toShow()
 
                 // Check if show already exists
                 if let existingShow = try Show.findByTraktId(traktShow.ids.trakt, in: db) {
