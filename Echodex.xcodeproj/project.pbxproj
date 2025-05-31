@@ -11,16 +11,16 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2CEECE2B2DE8F6E5002FF09F /* Echo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Echo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2CEECE2B2DE8F6E5002FF09F /* Echodex.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Echodex.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		2C600C152DE908080046C1B4 /* Exceptions for "Echo" folder in "Echo" target */ = {
+		2C600C152DE908080046C1B4 /* Exceptions for "Echo" folder in "Echodex" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				App/Info.plist,
 			);
-			target = 2CEECE2A2DE8F6E5002FF09F /* Echo */;
+			target = 2CEECE2A2DE8F6E5002FF09F /* Echodex */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -28,7 +28,7 @@
 		2CEECE2D2DE8F6E5002FF09F /* Echo */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				2C600C152DE908080046C1B4 /* Exceptions for "Echo" folder in "Echo" target */,
+				2C600C152DE908080046C1B4 /* Exceptions for "Echo" folder in "Echodex" target */,
 			);
 			path = Echo;
 			sourceTree = "<group>";
@@ -58,7 +58,7 @@
 		2CEECE2C2DE8F6E5002FF09F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				2CEECE2B2DE8F6E5002FF09F /* Echo.app */,
+				2CEECE2B2DE8F6E5002FF09F /* Echodex.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -66,9 +66,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		2CEECE2A2DE8F6E5002FF09F /* Echo */ = {
+		2CEECE2A2DE8F6E5002FF09F /* Echodex */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 2CEECE3E2DE8F6E6002FF09F /* Build configuration list for PBXNativeTarget "Echo" */;
+			buildConfigurationList = 2CEECE3E2DE8F6E6002FF09F /* Build configuration list for PBXNativeTarget "Echodex" */;
 			buildPhases = (
 				2CEECE272DE8F6E5002FF09F /* Sources */,
 				2CEECE282DE8F6E5002FF09F /* Frameworks */,
@@ -81,12 +81,12 @@
 			fileSystemSynchronizedGroups = (
 				2CEECE2D2DE8F6E5002FF09F /* Echo */,
 			);
-			name = Echo;
+			name = Echodex;
 			packageProductDependencies = (
 				2C682F262DEB2C680017FCD1 /* GRDB */,
 			);
-			productName = Echo;
-			productReference = 2CEECE2B2DE8F6E5002FF09F /* Echo.app */;
+			productName = Echodex;
+			productReference = 2CEECE2B2DE8F6E5002FF09F /* Echodex.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -104,7 +104,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 2CEECE262DE8F6E5002FF09F /* Build configuration list for PBXProject "Echo" */;
+			buildConfigurationList = 2CEECE262DE8F6E5002FF09F /* Build configuration list for PBXProject "Echodex" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -121,7 +121,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				2CEECE2A2DE8F6E5002FF09F /* Echo */,
+				2CEECE2A2DE8F6E5002FF09F /* Echodex */,
 			);
 		};
 /* End PBXProject section */
@@ -157,7 +157,7 @@
 				DEVELOPMENT_TEAM = P4DQK6SRKR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Echo/App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Echo;
+				INFOPLIST_KEY_CFBundleDisplayName = Echodex;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = Echo/Resources/LaunchScreen;
@@ -169,7 +169,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.marcusziade.echo.Echo;
+				PRODUCT_BUNDLE_IDENTIFIER = com.marcusziade.echodex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -191,7 +191,7 @@
 				DEVELOPMENT_TEAM = P4DQK6SRKR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Echo/App/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Echo;
+				INFOPLIST_KEY_CFBundleDisplayName = Echodex;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = Echo/Resources/LaunchScreen;
@@ -203,7 +203,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.marcusziade.echo.Echo;
+				PRODUCT_BUNDLE_IDENTIFIER = com.marcusziade.echodex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -272,6 +272,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -328,6 +329,7 @@
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
@@ -337,7 +339,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		2CEECE262DE8F6E5002FF09F /* Build configuration list for PBXProject "Echo" */ = {
+		2CEECE262DE8F6E5002FF09F /* Build configuration list for PBXProject "Echodex" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2CEECE412DE8F6E6002FF09F /* Debug */,
@@ -346,7 +348,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		2CEECE3E2DE8F6E6002FF09F /* Build configuration list for PBXNativeTarget "Echo" */ = {
+		2CEECE3E2DE8F6E6002FF09F /* Build configuration list for PBXNativeTarget "Echodex" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				2CEECE3F2DE8F6E6002FF09F /* Debug */,
