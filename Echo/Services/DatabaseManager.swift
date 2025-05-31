@@ -94,6 +94,28 @@ final class DatabaseManager {
             )
         }
 
+        // Migration v3: Create movies table
+        migrator.registerMigration("v3") { db in
+            try db.create(table: "movies") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("trakt_id", .integer).notNull().unique()
+                t.column("title", .text).notNull()
+                t.column("year", .integer)
+                t.column("overview", .text)
+                t.column("runtime", .integer)
+                t.column("released", .datetime)
+                t.column("certification", .text)
+                t.column("tagline", .text)
+                t.column("watched_at", .datetime)
+                t.column("updated_at", .datetime)
+            }
+
+            // Create indexes for common queries
+            try db.create(index: "idx_movies_trakt_id", on: "movies", columns: ["trakt_id"])
+            try db.create(index: "idx_movies_watched_at", on: "movies", columns: ["watched_at"])
+            try db.create(index: "idx_movies_released", on: "movies", columns: ["released"])
+        }
+
         return migrator
     }
 
@@ -179,12 +201,179 @@ final class DatabaseManager {
                 let unwatchedCount = try Episode.unwatched().fetchCount(db)
                 print("✅ Unwatched episodes: \(unwatchedCount)")
 
+                // Test movies
+                print("\n📽️ Testing Movies...")
+                try testMovies(in: db)
+
+                // Test watched progress
+                print("\n📊 Testing Watched Progress...")
+                try testWatchedProgress(in: db)
+
                 // Clean up test data
                 _ = try Show.deleteAll(db)
+                _ = try Movie.deleteAll(db)
                 print("✅ Test data cleaned up")
             }
         } catch {
             print("❌ Model test failed: \(error)")
         }
+    }
+
+    // MARK: - Movie Tests
+    private func testMovies(in db: Database) throws {
+        // Create test movies
+        var movie1 = Movie(
+            traktId: 120,
+            title: "The Lord of the Rings: The Fellowship of the Ring",
+            year: 2001,
+            overview:
+                "A meek Hobbit from the Shire and eight companions set out on a journey to destroy the powerful One Ring and save Middle-earth from the Dark Lord Sauron.",
+            runtime: 178,
+            released: Date(timeIntervalSince1970: 1_008_115_200),  // 2001-12-19
+            certification: "PG-13",
+            tagline: "One Ring To Rule Them All",
+            watchedAt: Date()  // Marked as watched
+        )
+
+        var movie2 = Movie(
+            traktId: 121,
+            title: "The Lord of the Rings: The Two Towers",
+            year: 2002,
+            overview:
+                "While Frodo and Sam edge closer to Mordor with the help of the shifty Gollum, the divided fellowship makes a stand against Sauron's new ally, Saruman, and his hordes of Isengard.",
+            runtime: 179,
+            released: Date(timeIntervalSince1970: 1_040_169_600),  // 2002-12-18
+            certification: "PG-13",
+            tagline: "A New Power Is Rising",
+            watchedAt: nil  // Not watched yet
+        )
+
+        try movie1.insert(db)
+        try movie2.insert(db)
+        print("✅ Movies saved")
+
+        // Test finding movie by Trakt ID
+        if let foundMovie = try Movie.findByTraktId(120, in: db) {
+            print("✅ Found movie by Trakt ID: \(foundMovie.title)")
+        }
+
+        // Test watched movies
+        let watchedMovies = try Movie.watched().fetchAll(db)
+        print("✅ Watched movies: \(watchedMovies.count)")
+        for movie in watchedMovies {
+            print("  - \(movie.title) (\(movie.year ?? 0))")
+        }
+
+        // Test unwatched movies
+        let unwatchedMovies = try Movie.unwatched().fetchAll(db)
+        print("✅ Unwatched movies: \(unwatchedMovies.count)")
+        for movie in unwatchedMovies {
+            print("  - \(movie.title) (\(movie.year ?? 0))")
+        }
+
+        // Test marking as watched/unwatched
+        if var movie = try Movie.findByTraktId(121, in: db) {
+            movie.markAsWatched()
+            try movie.update(db)
+            print("✅ Marked '\(movie.title)' as watched")
+
+            movie.markAsUnwatched()
+            try movie.update(db)
+            print("✅ Marked '\(movie.title)' as unwatched")
+        }
+    }
+
+    // MARK: - Watched Progress Tests
+    private func testWatchedProgress(in db: Database) throws {
+        // Create a test show with episodes
+        var show = Show(
+            traktId: 60625,
+            title: "Rick and Morty",
+            year: 2013,
+            overview:
+                "An animated series that follows the exploits of a super scientist and his not-so-bright grandson.",
+            runtime: 22,
+            status: "returning series",
+            network: "Adult Swim",
+            updatedAt: Date()
+        )
+
+        try show.insert(db)
+        show.id = db.lastInsertedRowID
+
+        guard let showId = show.id else { return }
+
+        // Create episodes for season 1
+        let season1Episodes = [
+            ("Pilot", 1, Date(timeIntervalSince1970: 1_386_547_200)),  // 2013-12-02
+            ("Lawnmower Dog", 2, Date(timeIntervalSince1970: 1_387_152_000)),  // 2013-12-09
+            ("Anatomy Park", 3, Date(timeIntervalSince1970: 1_387_756_800)),  // 2013-12-16
+            ("M. Night Shaym-Aliens!", 4, Date(timeIntervalSince1970: 1_389_571_200)),  // 2014-01-13
+            ("Meeseeks and Destroy", 5, Date(timeIntervalSince1970: 1_390_176_000)),  // 2014-01-20
+        ]
+
+        var episodeId = 1000
+        for (title, number, airedAt) in season1Episodes {
+            let episode = Episode(
+                showId: showId,
+                traktId: episodeId,
+                season: 1,
+                number: number,
+                title: title,
+                runtime: 22,
+                airedAt: airedAt,
+                watchedAt: nil
+            )
+            try episode.insert(db)
+            episodeId += 1
+        }
+
+        print("✅ Created show with \(season1Episodes.count) episodes")
+
+        // Test initial progress (nothing watched)
+        if let progress = try WatchedProgress.calculateForShow(showId: showId, in: db) {
+            print("\n📊 Initial Progress:")
+            print("  - Total episodes: \(progress.totalItems)")
+            print("  - Watched: \(progress.watchedItems)")
+            print("  - Progress: \(String(format: "%.1f", progress.progressPercentage))%")
+            print("  - Completed: \(progress.isCompleted)")
+            if let next = progress.nextItemToWatch {
+                print(
+                    "  - Next to watch: S\(next.season ?? 0)E\(next.episode ?? 0) - \(next.title ?? "Unknown")"
+                )
+            }
+        }
+
+        // Mark first 3 episodes as watched
+        try Episode.markAsWatched(showId: showId, upToSeason: 1, episode: 3, in: db)
+        print("\n✅ Marked episodes 1-3 as watched")
+
+        // Check progress after watching
+        if let progress = try WatchedProgress.calculateForShow(showId: showId, in: db) {
+            print("\n📊 Progress after watching:")
+            print("  - Watched: \(progress.watchedItems)/\(progress.totalItems)")
+            print("  - Progress: \(String(format: "%.1f", progress.progressPercentage))%")
+            print("  - Remaining: \(progress.remainingItems) episodes")
+            if let next = progress.nextItemToWatch {
+                print(
+                    "  - Next to watch: S\(next.season ?? 0)E\(next.episode ?? 0) - \(next.title ?? "Unknown")"
+                )
+            }
+        }
+
+        // Test marking entire season as watched
+        try Episode.markSeasonAsWatched(showId: showId, season: 1, in: db)
+        print("\n✅ Marked entire season 1 as watched")
+
+        if let progress = try WatchedProgress.calculateForShow(showId: showId, in: db) {
+            print("\n📊 Final Progress:")
+            print("  - Watched: \(progress.watchedItems)/\(progress.totalItems)")
+            print("  - Progress: \(String(format: "%.1f", progress.progressPercentage))%")
+            print("  - Completed: \(progress.isCompleted)")
+        }
+
+        // Test progress for all shows
+        let allProgress = try WatchedProgress.calculateForAllShows(in: db)
+        print("\n📊 Progress for all shows: \(allProgress.count) shows tracked")
     }
 }

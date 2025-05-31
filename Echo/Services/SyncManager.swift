@@ -268,12 +268,3 @@ struct ShowSyncStats {
         return airedEpisodes - watchedEpisodes
     }
 }
-
-// MARK: - Date Extension
-private extension String {
-    func toDate() -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: self)
-    }
-}
