@@ -8,7 +8,27 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication
             .LaunchOptionsKey: Any]?
     ) -> Bool {
-        // Override point for customization after application launch.
+
+        // Setup database
+        setupDatabase()
+
         return true
+    }
+
+    private func setupDatabase() {
+        do {
+            try DatabaseManager.shared.setup()
+            print("✅ Database initialized successfully")
+
+            // Run test in DEBUG mode
+            #if DEBUG
+                DatabaseManager.shared.testDatabaseSetup()
+            #endif
+
+        } catch {
+            print("❌ Failed to initialize database: \(error)")
+            // In production, you might want to show an error to the user
+            // or try to recover from this error
+        }
     }
 }

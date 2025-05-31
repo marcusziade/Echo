@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		2C682F272DEB2C680017FCD1 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = 2C682F262DEB2C680017FCD1 /* GRDB */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		2CEECE2B2DE8F6E5002FF09F /* Echo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Echo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -36,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2C682F272DEB2C680017FCD1 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 			);
 			name = Echo;
 			packageProductDependencies = (
+				2C682F262DEB2C680017FCD1 /* GRDB */,
 			);
 			productName = Echo;
 			productReference = 2CEECE2B2DE8F6E5002FF09F /* Echo.app */;
@@ -107,6 +113,9 @@
 			);
 			mainGroup = 2CEECE222DE8F6E5002FF09F;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				2C682F252DEB2C680017FCD1 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2CEECE2C2DE8F6E5002FF09F /* Products */;
 			projectDirPath = "";
@@ -347,6 +356,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		2C682F252DEB2C680017FCD1 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		2C682F262DEB2C680017FCD1 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2C682F252DEB2C680017FCD1 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 2CEECE232DE8F6E5002FF09F /* Project object */;
 }
