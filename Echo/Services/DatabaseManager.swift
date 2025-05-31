@@ -48,88 +48,143 @@ final class DatabaseManager {
     private var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
-        // Migration v1: Create shows table
+        // Migration v1: Create shows table (enhanced)
         migrator.registerMigration("v1") { db in
             try db.create(table: "shows") { t in
                 t.autoIncrementedPrimaryKey("id")
+                t.column("trakt_id", .integer).notNull().unique()
                 t.column("title", .text).notNull()
+                t.column("year", .integer)
+                t.column("overview", .text)
+                t.column("runtime", .integer)
+                t.column("status", .text)
+                t.column("network", .text)
+                t.column("updated_at", .datetime)
             }
+
+            // Create index on trakt_id for faster lookups
+            try db.create(index: "idx_shows_trakt_id", on: "shows", columns: ["trakt_id"])
+        }
+
+        // Migration v2: Create episodes table
+        migrator.registerMigration("v2") { db in
+            try db.create(table: "episodes") { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("show_id", .integer)
+                    .notNull()
+                    .references("shows", onDelete: .cascade)
+                t.column("trakt_id", .integer).notNull().unique()
+                t.column("season", .integer).notNull()
+                t.column("number", .integer).notNull()
+                t.column("title", .text)
+                t.column("overview", .text)
+                t.column("runtime", .integer)
+                t.column("aired_at", .datetime)
+                t.column("watched_at", .datetime)
+            }
+
+            // Create indexes for common queries
+            try db.create(index: "idx_episodes_show_id", on: "episodes", columns: ["show_id"])
+            try db.create(index: "idx_episodes_trakt_id", on: "episodes", columns: ["trakt_id"])
+            try db.create(
+                index: "idx_episodes_show_season_number",
+                on: "episodes",
+                columns: ["show_id", "season", "number"],
+                unique: true
+            )
         }
 
         return migrator
     }
 
-    // MARK: - Test Helper
-    func testDatabaseSetup() {
+    // MARK: - Test Helpers
+    func testModels() {
         do {
-            // Setup database
-            try setup()
-
-            // Test read
-            try dbQueue?.read { db in
-                // Check if shows table exists
-                let tableExists = try db.tableExists("shows")
-                print("✅ Shows table exists: \(tableExists)")
-
-                // Get table info
-                let columns = try db.columns(in: "shows")
-                print("✅ Shows table columns:")
-                for column in columns {
-                    print("  - \(column.name): \(column.type)")
-                }
-            }
-
-            // Test write with model (if you've created Show.swift)
-            // Uncomment the following if you've added the Show model:
-            /*
-             try dbQueue?.write { db in
-             // Create and save a test show
-             var testShow = Show(title: "Breaking Bad")
-             try testShow.save(db)
-
-             // Fetch all shows
-             let shows = try Show.fetchAll(db)
-             print("✅ Model test successful. Shows count: \(shows.count)")
-             print("✅ First show: \(shows.first?.title ?? "none")")
-
-             // Clean up
-             _ = try testShow.delete(db)
-             }
-             */
-
-            // Test write with raw SQL
             try dbQueue?.write { db in
-                // Insert a test show
-                try db.execute(
-                    sql: "INSERT INTO shows (title) VALUES (?)",
-                    arguments: ["Test Show"]
+                // Create a test show
+                var show = Show(
+                    traktId: 1390,
+                    title: "Breaking Bad",
+                    year: 2008,
+                    overview:
+                        "A high school chemistry teacher diagnosed with cancer starts making meth.",
+                    runtime: 45,
+                    status: "ended",
+                    network: "AMC",
+                    updatedAt: Date()
                 )
 
-                // Query it back
-                let count = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM shows")!
-                print("✅ Test insert successful. Row count: \(count)")
+                try show.insert(db)
+
+                // Get the last inserted row ID
+                show.id = db.lastInsertedRowID
+
+                print("✅ Show saved with ID: \(show.id ?? 0)")
+
+                // Make sure we have a valid show ID
+                guard let showId = show.id, showId > 0 else {
+                    print("❌ Failed to get show ID after insert")
+                    return
+                }
+
+                // Create some episodes
+                var episode1 = Episode(
+                    showId: showId,
+                    traktId: 73640,
+                    season: 1,
+                    number: 1,
+                    title: "Pilot",
+                    overview: "Walter White, a struggling high school chemistry teacher...",
+                    runtime: 58,
+                    airedAt: Date(timeIntervalSince1970: 1_200_880_800),  // 2008-01-20
+                    watchedAt: nil
+                )
+
+                var episode2 = Episode(
+                    showId: showId,
+                    traktId: 73641,
+                    season: 1,
+                    number: 2,
+                    title: "Cat's in the Bag...",
+                    overview: "Walt and Jesse attempt to tie up loose ends...",
+                    runtime: 48,
+                    airedAt: Date(timeIntervalSince1970: 1_201_485_600),  // 2008-01-27
+                    watchedAt: Date()  // Marked as watched
+                )
+
+                try episode1.insert(db)
+                try episode2.insert(db)
+                print("✅ Episodes saved")
+
+                // Test fetching show with episodes
+                if let fetchedShow = try Show.fetchOne(db, key: showId) {
+                    let episodes = try fetchedShow.episodes.fetchAll(db)
+                    print("✅ Fetched show '\(fetchedShow.title)' with \(episodes.count) episodes")
+
+                    for episode in episodes {
+                        let watchedStatus = episode.watchedAt != nil ? "watched" : "unwatched"
+                        print(
+                            "  - S\(episode.season)E\(episode.number): \(episode.title ?? "Untitled") [\(watchedStatus)]"
+                        )
+                    }
+                }
+
+                // Test finding episode
+                if let foundEpisode = try Episode.find(showId: showId, season: 1, number: 1, in: db)
+                {
+                    print("✅ Found episode by season/number: \(foundEpisode.title ?? "Untitled")")
+                }
+
+                // Test unwatched episodes query
+                let unwatchedCount = try Episode.unwatched().fetchCount(db)
+                print("✅ Unwatched episodes: \(unwatchedCount)")
 
                 // Clean up test data
-                try db.execute(sql: "DELETE FROM shows WHERE title = ?", arguments: ["Test Show"])
+                _ = try Show.deleteAll(db)
+                print("✅ Test data cleaned up")
             }
-
         } catch {
-            print("❌ Database test failed: \(error)")
-        }
-    }
-}
-
-// MARK: - Database Errors
-enum DatabaseError: LocalizedError {
-    case notInitialized
-    case migrationFailed(Error)
-
-    var errorDescription: String? {
-        switch self {
-        case .notInitialized:
-            return "Database not initialized"
-        case .migrationFailed(let error):
-            return "Migration failed: \(error.localizedDescription)"
+            print("❌ Model test failed: \(error)")
         }
     }
 }

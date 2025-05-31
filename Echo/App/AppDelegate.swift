@@ -5,8 +5,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(
         _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication
-            .LaunchOptionsKey: Any]?
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
 
         // Setup database
@@ -20,9 +19,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
             try DatabaseManager.shared.setup()
             print("✅ Database initialized successfully")
 
-            // Run test in DEBUG mode
+            // Run tests in DEBUG mode
             #if DEBUG
-                DatabaseManager.shared.testDatabaseSetup()
+                DatabaseManager.shared.testModels()
             #endif
 
         } catch {
