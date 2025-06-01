@@ -10,6 +10,8 @@ final class HomeViewModel: ObservableObject {
     @Published var isSyncing = false
     @Published var sortOption: HomeViewController.SortOption = .airDate
     @Published var isLoadingMore = false
+    @Published var isInitialLoading = false
+    @Published var skeletonItemCount = 8
     
     // MARK: - Properties
     private var cancellables = Set<AnyCancellable>()
@@ -152,6 +154,7 @@ final class HomeViewModel: ObservableObject {
             isSyncing = true
             if upNextItems.isEmpty {
                 isLoading = true
+                isInitialLoading = true
             }
         }
         
@@ -203,6 +206,7 @@ final class HomeViewModel: ObservableObject {
         await MainActor.run {
             isSyncing = false
             isLoading = false
+            isInitialLoading = false
         }
     }
     
@@ -255,6 +259,7 @@ final class HomeViewModel: ObservableObject {
     private func setupObservations() {
         databaseObservationService.observeUpNextEpisodes()
             .receive(on: DispatchQueue.main)
+            .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main) // Debounce rapid updates
             .sink(
                 receiveCompletion: { completion in
                     if case .failure(let error) = completion {
@@ -264,15 +269,54 @@ final class HomeViewModel: ObservableObject {
                 receiveValue: { [weak self] items in
                     guard let self = self else { return }
                     // Store all items and apply sorting
-                    self.allUpNextItems = self.sortItems(items)
-                    // Reset pagination
-                    self.currentPage = 0
-                    self.hasMoreItems = true
-                    // Load first page
-                    self.loadFirstPage()
+                    let sortedItems = self.sortItems(items)
+                    
+                    // During initial loading, wait for a reasonable batch before showing items
+                    if self.isInitialLoading && sortedItems.count < min(8, items.count) {
+                        return // Wait for more items to load
+                    }
+                    
+                    self.allUpNextItems = sortedItems
+                    
+                    // If we're not initially loading, preserve current scroll position by updating displayed items more carefully
+                    if !self.isInitialLoading && !self.upNextItems.isEmpty {
+                        self.updateDisplayedItemsStably()
+                    } else {
+                        // Reset pagination for fresh loads
+                        self.currentPage = 0
+                        self.hasMoreItems = true
+                        self.loadFirstPage()
+                    }
                 }
             )
             .store(in: &cancellables)
+    }
+    
+    private func updateDisplayedItemsStably() {
+        // Preserve existing items in their positions, add new ones at the end
+        let currentlyDisplayedIds = Set(upNextItems.map { $0.show.id })
+        let newItems = allUpNextItems.filter { !currentlyDisplayedIds.contains($0.show.id) }
+        
+        // Update existing items in place and append new ones
+        var updatedItems = upNextItems
+        
+        // Update existing items with fresh data
+        for i in 0..<updatedItems.count {
+            if let freshItem = allUpNextItems.first(where: { $0.show.id == updatedItems[i].show.id }) {
+                updatedItems[i] = freshItem
+            }
+        }
+        
+        // Add new items
+        updatedItems.append(contentsOf: newItems)
+        
+        // Apply sorting to the final result
+        upNextItems = sortItems(updatedItems)
+        
+        // Update pagination state
+        let totalAvailable = allUpNextItems.count
+        hasMoreItems = upNextItems.count < totalAvailable
+        currentPage = min(upNextItems.count / pageSize, totalAvailable / pageSize)
     }
     
     private func sortItems(_ items: [UpNextItem]) -> [UpNextItem] {

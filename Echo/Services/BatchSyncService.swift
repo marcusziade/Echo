@@ -22,51 +22,90 @@ final class BatchSyncService {
         showIds: [Int64],
         progress: ((BatchSyncProgress) -> Void)? = nil
     ) async throws -> BatchSyncResult {
-
+        return try await syncMultipleShowsConcurrently(
+            showIds: showIds,
+            maxConcurrency: 16,
+            progress: progress
+        )
+    }
+    
+    /// Sync multiple shows concurrently with limited concurrency
+    /// - Parameters:
+    ///   - showIds: Array of show database IDs to sync
+    ///   - maxConcurrency: Maximum number of concurrent operations (default 16)
+    ///   - progress: Progress callback (called after each show)
+    /// - Returns: Results of the batch operation
+    @discardableResult
+    func syncMultipleShowsConcurrently(
+        showIds: [Int64],
+        maxConcurrency: Int = 16,
+        progress: ((BatchSyncProgress) -> Void)? = nil
+    ) async throws -> BatchSyncResult {
+        
+        let semaphore = AsyncSemaphore(value: maxConcurrency)
+        let progressLock = NSLock()
+        var completedCount = 0
         var successCount = 0
         var failedShows: [(showId: Int64, error: Error)] = []
         var totalEpisodesSynced = 0
-
-        for (index, showId) in showIds.enumerated() {
-            // Report progress
-            progress?(
-                BatchSyncProgress(
-                    current: index,
-                    total: showIds.count,
-                    currentShowId: showId,
-                    phase: .starting
-                ))
-
-            do {
-                // Sync the show
-                let syncedEpisodes = try await syncShowWithEpisodes(showId: showId) { phase in
-                    progress?(
-                        BatchSyncProgress(
-                            current: index,
-                            total: showIds.count,
-                            currentShowId: showId,
-                            phase: phase
-                        ))
+        
+        // Create concurrent tasks for all shows
+        await withTaskGroup(of: SyncShowResult.self) { group in
+            for showId in showIds {
+                group.addTask {
+                    await semaphore.wait()
+                    defer { semaphore.signal() }
+                    
+                    do {
+                        let syncedEpisodes = try await self.syncShowWithEpisodes(showId: showId) { phase in
+                            // Thread-safe progress reporting
+                            progressLock.lock()
+                            progress?(
+                                BatchSyncProgress(
+                                    current: completedCount,
+                                    total: showIds.count,
+                                    currentShowId: showId,
+                                    phase: phase
+                                ))
+                            progressLock.unlock()
+                        }
+                        
+                        return SyncShowResult.success(showId: showId, episodeCount: syncedEpisodes)
+                    } catch {
+                        return SyncShowResult.failure(showId: showId, error: error)
+                    }
                 }
-
-                successCount += 1
-                totalEpisodesSynced += syncedEpisodes
-
-            } catch {
-                failedShows.append((showId: showId, error: error))
-                print("❌ Failed to sync show \(showId): \(error)")
             }
-
-            // Report completion for this show
-            progress?(
-                BatchSyncProgress(
-                    current: index + 1,
-                    total: showIds.count,
-                    currentShowId: showId,
-                    phase: .completed
-                ))
+            
+            // Collect results as they complete
+            for await result in group {
+                progressLock.lock()
+                
+                switch result {
+                case .success(let showId, let episodeCount):
+                    successCount += 1
+                    totalEpisodesSynced += episodeCount
+                    
+                case .failure(let showId, let error):
+                    failedShows.append((showId: showId, error: error))
+                    print("❌ Failed to sync show \(showId): \(error)")
+                }
+                
+                completedCount += 1
+                
+                // Report overall progress
+                progress?(
+                    BatchSyncProgress(
+                        current: completedCount,
+                        total: showIds.count,
+                        currentShowId: -1,
+                        phase: .completed
+                    ))
+                
+                progressLock.unlock()
+            }
         }
-
+        
         return BatchSyncResult(
             totalShows: showIds.count,
             successCount: successCount,
@@ -441,4 +480,32 @@ struct BatchImportResult {
     var totalProcessed: Int {
         return totalImported + totalUpdated
     }
+}
+
+// MARK: - Helper Types for Concurrent Sync
+
+struct AsyncSemaphore {
+    private let semaphore: DispatchSemaphore
+    
+    init(value: Int) {
+        semaphore = DispatchSemaphore(value: value)
+    }
+    
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            Task.detached {
+                semaphore.wait()
+                continuation.resume()
+            }
+        }
+    }
+    
+    func signal() {
+        semaphore.signal()
+    }
+}
+
+enum SyncShowResult {
+    case success(showId: Int64, episodeCount: Int)
+    case failure(showId: Int64, error: Error)
 }

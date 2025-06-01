@@ -102,8 +102,8 @@ final class UpNextTableViewCell: UITableViewCell {
             containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
             
-            // Poster Image - Removed bottom constraint to fix conflict
-            posterImageView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 12),
+            // Poster Image - Vertically centered in container
+            posterImageView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
             posterImageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 12),
             posterImageView.widthAnchor.constraint(equalToConstant: 70),
             posterImageView.heightAnchor.constraint(equalToConstant: 105),
@@ -142,6 +142,9 @@ final class UpNextTableViewCell: UITableViewCell {
     
     // MARK: - Configuration
     func configure(with item: UpNextItem) {
+        // Check if this is a transition from skeleton (no data) to real content
+        let isTransitioningFromSkeleton = showTitleLabel.text == nil || showTitleLabel.text == ""
+        
         showTitleLabel.text = item.show.title
         episodeInfoLabel.text = "S\(item.nextEpisode.season)E\(item.nextEpisode.number)"
         episodeTitleLabel.text = item.nextEpisode.title ?? "Episode \(item.nextEpisode.number)"
@@ -167,7 +170,7 @@ final class UpNextTableViewCell: UITableViewCell {
         // Cancel previous image loading task
         imageLoadingTask?.cancel()
         
-        // Load poster image
+        // Load poster image with animation if transitioning from skeleton
         if let posterUrl = item.show.posterUrl {
             posterImageView.contentMode = .scaleAspectFill
             
@@ -175,7 +178,11 @@ final class UpNextTableViewCell: UITableViewCell {
                 do {
                     if let image = try await ImageLoadingService.shared.loadImage(from: posterUrl) {
                         await MainActor.run {
-                            self.posterImageView.image = image
+                            if isTransitioningFromSkeleton {
+                                self.animateImageIn(image)
+                            } else {
+                                self.posterImageView.image = image
+                            }
                         }
                     } else {
                         await MainActor.run {
@@ -191,6 +198,11 @@ final class UpNextTableViewCell: UITableViewCell {
         } else {
             setPlaceholderImage()
         }
+        
+        // Animate text elements if transitioning from skeleton
+        if isTransitioningFromSkeleton {
+            animateTextElementsIn()
+        }
     }
     
     private func setPlaceholderImage() {
@@ -199,10 +211,64 @@ final class UpNextTableViewCell: UITableViewCell {
         posterImageView.contentMode = .scaleAspectFit
     }
     
+    // MARK: - Animation Methods
+    private func animateImageIn(_ image: UIImage) {
+        // Start with the image invisible
+        posterImageView.alpha = 0
+        posterImageView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        posterImageView.image = image
+        
+        // Animate in with a beautiful fade + scale
+        UIView.animate(withDuration: 0.6, delay: 0.1, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: [.curveEaseOut], animations: {
+            self.posterImageView.alpha = 1.0
+            self.posterImageView.transform = CGAffineTransform.identity
+        }, completion: nil)
+    }
+    
+    private func animateTextElementsIn() {
+        let textElements = [showTitleLabel, episodeInfoLabel, episodeTitleLabel, airDateLabel, progressView]
+        
+        // Start with all text elements invisible with a more dramatic effect
+        for (index, element) in textElements.enumerated() {
+            element.alpha = 0
+            element.transform = CGAffineTransform(translationX: 30, y: -10).scaledBy(x: 0.9, y: 0.9)
+            
+            // Stagger the animations with smoother timing
+            let delay = Double(index) * 0.1 + 0.25
+            
+            // Use more sophisticated spring animation
+            UIView.animate(withDuration: 0.8, delay: delay, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.3, options: [.curveEaseOut, .allowUserInteraction], animations: {
+                element.alpha = 1.0
+                element.transform = CGAffineTransform.identity
+            }, completion: nil)
+        }
+        
+        // Add a subtle container bounce effect
+        containerView.transform = CGAffineTransform(scaleX: 0.98, y: 0.98)
+        UIView.animate(withDuration: 0.6, delay: 0.15, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.2, options: [.curveEaseOut], animations: {
+            self.containerView.transform = CGAffineTransform.identity
+        }, completion: nil)
+    }
+    
     override func prepareForReuse() {
         super.prepareForReuse()
         imageLoadingTask?.cancel()
         posterImageView.image = nil
         progressView.progress = 0
+        
+        // Reset any animations
+        containerView.transform = CGAffineTransform.identity
+        posterImageView.alpha = 1.0
+        posterImageView.transform = CGAffineTransform.identity
+        showTitleLabel.alpha = 1.0
+        showTitleLabel.transform = CGAffineTransform.identity
+        episodeInfoLabel.alpha = 1.0
+        episodeInfoLabel.transform = CGAffineTransform.identity
+        episodeTitleLabel.alpha = 1.0
+        episodeTitleLabel.transform = CGAffineTransform.identity
+        airDateLabel.alpha = 1.0
+        airDateLabel.transform = CGAffineTransform.identity
+        progressView.alpha = 1.0
+        progressView.transform = CGAffineTransform.identity
     }
 }

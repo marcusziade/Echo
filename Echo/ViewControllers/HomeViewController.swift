@@ -5,6 +5,7 @@ final class HomeViewController: UIViewController {
 
     // MARK: - Section
     enum Section: CaseIterable {
+        case skeleton
         case main
         case loading
     }
@@ -73,12 +74,6 @@ final class HomeViewController: UIViewController {
         return label
     }()
 
-    private let loadingIndicator: UIActivityIndicatorView = {
-        let indicator = UIActivityIndicatorView(style: .large)
-        indicator.translatesAutoresizingMaskIntoConstraints = false
-        indicator.hidesWhenStopped = true
-        return indicator
-    }()
 
     // MARK: - Properties
     private var dataSource: UITableViewDiffableDataSource<Section, UpNextItem>!
@@ -129,7 +124,6 @@ final class HomeViewController: UIViewController {
 
         view.addSubview(tableView)
         view.addSubview(emptyStateView)
-        view.addSubview(loadingIndicator)
 
         emptyStateView.addSubview(emptyStateImageView)
         emptyStateView.addSubview(emptyStateLabel)
@@ -169,10 +163,6 @@ final class HomeViewController: UIViewController {
             emptyStateSubtitleLabel.trailingAnchor.constraint(
                 equalTo: emptyStateView.trailingAnchor),
             emptyStateSubtitleLabel.bottomAnchor.constraint(equalTo: emptyStateView.bottomAnchor),
-
-            // Loading Indicator
-            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
         ])
     }
 
@@ -185,15 +175,25 @@ final class HomeViewController: UIViewController {
     }
 
     private func configureDataSource() {
-        // Register loading cell
+        // Register cells
         tableView.register(LoadingTableViewCell.self, forCellReuseIdentifier: LoadingTableViewCell.identifier)
+        tableView.register(SkeletonTableViewCell.self, forCellReuseIdentifier: SkeletonTableViewCell.identifier)
         
         dataSource = UITableViewDiffableDataSource<Section, UpNextItem>(
             tableView: tableView
         ) { [weak self] tableView, indexPath, item in
             let section = self?.dataSource.snapshot().sectionIdentifiers[indexPath.section]
             
-            if section == .loading {
+            if section == .skeleton {
+                guard let cell = tableView.dequeueReusableCell(
+                    withIdentifier: SkeletonTableViewCell.identifier,
+                    for: indexPath
+                ) as? SkeletonTableViewCell
+                else {
+                    return UITableViewCell()
+                }
+                return cell
+            } else if section == .loading {
                 guard let cell = tableView.dequeueReusableCell(
                     withIdentifier: LoadingTableViewCell.identifier,
                     for: indexPath
@@ -221,17 +221,6 @@ final class HomeViewController: UIViewController {
     }
 
     private func setupBindings() {
-        // Bind loading state
-        viewModel.$isLoading
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] isLoading in
-                if isLoading {
-                    self?.loadingIndicator.startAnimating()
-                } else {
-                    self?.loadingIndicator.stopAnimating()
-                }
-            }
-            .store(in: &cancellables)
         
         // Bind syncing state
         viewModel.$isSyncing
@@ -257,6 +246,14 @@ final class HomeViewController: UIViewController {
             }
             .store(in: &cancellables)
         
+        // Bind initial loading state
+        viewModel.$isInitialLoading
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateSnapshot()
+            }
+            .store(in: &cancellables)
+        
         // Bind sort option
         viewModel.$sortOption
             .receive(on: DispatchQueue.main)
@@ -273,7 +270,13 @@ final class HomeViewController: UIViewController {
         
         var snapshot = NSDiffableDataSourceSnapshot<Section, UpNextItem>()
         
-        if !items.isEmpty {
+        // Show skeleton loading during initial sync
+        if viewModel.isInitialLoading && items.isEmpty {
+            snapshot.appendSections([.skeleton])
+            // Create dummy skeleton items
+            let skeletonItems = createSkeletonItems(count: viewModel.skeletonItemCount)
+            snapshot.appendItems(skeletonItems, toSection: .skeleton)
+        } else if !items.isEmpty {
             snapshot.appendSections([.main])
             snapshot.appendItems(items, toSection: .main)
             
@@ -281,27 +284,135 @@ final class HomeViewController: UIViewController {
             if viewModel.isLoadingMore {
                 snapshot.appendSections([.loading])
                 // Create a dummy item for the loading cell
-                let dummyItem = UpNextItem(
-                    show: Show(traktId: -1, title: "Loading", year: nil, overview: nil, runtime: nil, status: nil, network: nil, updatedAt: nil, posterUrl: nil, backdropUrl: nil, tmdbId: nil),
-                    nextEpisode: Episode(showId: -1, traktId: -1, season: 0, number: 0, title: nil, overview: nil, runtime: nil, airedAt: nil, watchedAt: nil),
-                    progress: nil
-                )
+                let dummyItem = createDummyLoadingItem()
                 snapshot.appendItems([dummyItem], toSection: .loading)
             }
         }
 
-        // Use less aggressive animations for large datasets
-        let animatingDifferences = items.count < 20
+        // Check if we're transitioning from skeleton to real content
+        let isTransitioningFromSkeleton = !snapshot.sectionIdentifiers.contains(.skeleton) && 
+                                         !items.isEmpty && 
+                                         !viewModel.isInitialLoading &&
+                                         dataSource.snapshot().sectionIdentifiers.contains(.skeleton)
         
-        dataSource.apply(snapshot, animatingDifferences: animatingDifferences) { [weak self] in
-            guard let self = self else { return }
-            self.showEmptyState(items.isEmpty && !self.viewModel.isLoading)
+        // Use smooth animations when transitioning from skeleton to content
+        let animatingDifferences = isTransitioningFromSkeleton || (items.count < 20 && !viewModel.isInitialLoading)
+        
+        if isTransitioningFromSkeleton {
+            // Apply with crossfade transition for skeleton to content
+            UIView.transition(with: tableView, duration: 0.7, options: [.transitionCrossDissolve], animations: {
+                self.dataSource.apply(snapshot, animatingDifferences: false)
+            }) { [weak self] _ in
+                self?.handlePostTransitionCleanup()
+            }
+        } else {
+            dataSource.apply(snapshot, animatingDifferences: animatingDifferences) { [weak self] in
+                self?.handlePostTransitionCleanup()
+            }
+        }
+    }
+    
+    private func handlePostTransitionCleanup() {
+        let items = viewModel.sortedItems
+        let shouldShowEmpty = items.isEmpty && !viewModel.isLoading && !viewModel.isInitialLoading
+        showEmptyState(shouldShowEmpty)
+        
+        // Add scale animation when content loads for the first time
+        if !viewModel.isInitialLoading && !items.isEmpty && tableView.transform != .identity {
+            UIView.animate(withDuration: 0.5, delay: 0.1, options: [.curveEaseOut], animations: {
+                self.tableView.transform = CGAffineTransform.identity
+            }, completion: nil)
         }
     }
 
     private func showEmptyState(_ show: Bool) {
         emptyStateView.isHidden = !show
         tableView.isHidden = show && !viewModel.isLoading
+        
+        // Prepare table view for transition animation during initial loading
+        if viewModel.isInitialLoading && !show {
+            tableView.alpha = 1.0  // Keep skeleton fully visible
+            tableView.transform = CGAffineTransform(scaleX: 0.98, y: 0.98)  // Subtle scale for transition
+        }
+    }
+    
+    private func createSkeletonItems(count: Int) -> [UpNextItem] {
+        return (0..<count).map { index in
+            let indexInt64 = Int64(index)
+            var skeletonShow = Show(
+                traktId: -index - 1,
+                title: "Skeleton",
+                year: nil,
+                overview: nil,
+                runtime: nil,
+                status: nil,
+                network: nil,
+                updatedAt: nil,
+                posterUrl: nil,
+                backdropUrl: nil,
+                tmdbId: nil
+            )
+            // Set unique ID for skeleton show
+            skeletonShow.id = -indexInt64 - 1000
+            
+            var skeletonEpisode = Episode(
+                showId: -indexInt64 - 1,
+                traktId: -index - 1,
+                season: 0,
+                number: 0,
+                title: nil,
+                overview: nil,
+                runtime: nil,
+                airedAt: nil,
+                watchedAt: nil
+            )
+            // Set unique ID for skeleton episode
+            skeletonEpisode.id = -indexInt64 - 2000
+            
+            return UpNextItem(
+                show: skeletonShow,
+                nextEpisode: skeletonEpisode,
+                progress: nil
+            )
+        }
+    }
+    
+    private func createDummyLoadingItem() -> UpNextItem {
+        var loadingShow = Show(
+            traktId: -1,
+            title: "Loading",
+            year: nil,
+            overview: nil,
+            runtime: nil,
+            status: nil,
+            network: nil,
+            updatedAt: nil,
+            posterUrl: nil,
+            backdropUrl: nil,
+            tmdbId: nil
+        )
+        // Set unique ID for loading show
+        loadingShow.id = -999
+        
+        var loadingEpisode = Episode(
+            showId: -1,
+            traktId: -1,
+            season: 0,
+            number: 0,
+            title: nil,
+            overview: nil,
+            runtime: nil,
+            airedAt: nil,
+            watchedAt: nil
+        )
+        // Set unique ID for loading episode
+        loadingEpisode.id = -999
+        
+        return UpNextItem(
+            show: loadingShow,
+            nextEpisode: loadingEpisode,
+            progress: nil
+        )
     }
 
     // MARK: - Actions
@@ -351,8 +462,8 @@ extension HomeViewController: UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
 
         guard let item = dataSource.itemIdentifier(for: indexPath) else { return }
-        // Don't handle selection for loading cell
-        if item.show.traktId == -1 { return }
+        // Don't handle selection for loading or skeleton cells
+        if item.show.traktId <= -1 { return }
         
         // TODO: Navigate to episode details
         print(
