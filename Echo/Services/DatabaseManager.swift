@@ -115,6 +115,27 @@ final class DatabaseManager {
             try db.create(index: "idx_movies_watched_at", on: "movies", columns: ["watched_at"])
             try db.create(index: "idx_movies_released", on: "movies", columns: ["released"])
         }
+        
+        // Migration v4: Add image fields to shows and movies
+        migrator.registerMigration("v4") { db in
+            // Add image fields to shows
+            try db.alter(table: "shows") { t in
+                t.add(column: "poster_url", .text)
+                t.add(column: "backdrop_url", .text)
+                t.add(column: "tmdb_id", .integer)
+            }
+            
+            // Add image fields to movies
+            try db.alter(table: "movies") { t in
+                t.add(column: "poster_url", .text)
+                t.add(column: "backdrop_url", .text)
+                t.add(column: "tmdb_id", .integer)
+            }
+            
+            // Create indexes for TMDB IDs
+            try db.create(index: "idx_shows_tmdb_id", on: "shows", columns: ["tmdb_id"])
+            try db.create(index: "idx_movies_tmdb_id", on: "movies", columns: ["tmdb_id"])
+        }
 
         return migrator
     }

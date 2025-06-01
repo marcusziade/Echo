@@ -12,6 +12,9 @@ struct Show: Codable {
     let status: String?  // "returning series", "ended", etc.
     let network: String?
     let updatedAt: Date?
+    var posterUrl: String?
+    var backdropUrl: String?
+    let tmdbId: Int?
 
     enum Columns: String, ColumnExpression {
         case id
@@ -23,6 +26,9 @@ struct Show: Codable {
         case status
         case network
         case updatedAt = "updated_at"
+        case posterUrl = "poster_url"
+        case backdropUrl = "backdrop_url"
+        case tmdbId = "tmdb_id"
     }
 
     enum CodingKeys: String, CodingKey {
@@ -35,12 +41,16 @@ struct Show: Codable {
         case status
         case network
         case updatedAt = "updated_at"
+        case posterUrl = "poster_url"
+        case backdropUrl = "backdrop_url"
+        case tmdbId = "tmdb_id"
     }
 
     init(
         id: Int64? = nil, traktId: Int, title: String, year: Int? = nil,
         overview: String? = nil, runtime: Int? = nil, status: String? = nil,
-        network: String? = nil, updatedAt: Date? = nil
+        network: String? = nil, updatedAt: Date? = nil, posterUrl: String? = nil,
+        backdropUrl: String? = nil, tmdbId: Int? = nil
     ) {
         self.id = id
         self.traktId = traktId
@@ -51,6 +61,9 @@ struct Show: Codable {
         self.status = status
         self.network = network
         self.updatedAt = updatedAt
+        self.posterUrl = posterUrl
+        self.backdropUrl = backdropUrl
+        self.tmdbId = tmdbId
     }
 }
 
@@ -72,6 +85,9 @@ extension Show: FetchableRecord, PersistableRecord {
         container["status"] = status
         container["network"] = network
         container["updated_at"] = updatedAt
+        container["poster_url"] = posterUrl
+        container["backdrop_url"] = backdropUrl
+        container["tmdb_id"] = tmdbId
     }
 
     // Tell GRDB that id is auto-generated

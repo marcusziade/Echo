@@ -190,13 +190,21 @@ final class BatchSyncService {
 
             // Import shows
             for traktShow in shows {
-                var show = traktShow.toShow()
-
-                if let existingShow = try Show.findByTraktId(show.traktId, in: db) {
-                    show.id = existingShow.id
-                    try show.update(db)
+                if let existingShow = try Show.findByTraktId(traktShow.ids.trakt, in: db) {
+                    // Update existing show with new data from Trakt
+                    var updatedShow = traktShow.toShow()
+                    updatedShow.id = existingShow.id
+                    // Preserve existing image URLs if Trakt doesn't have them
+                    if updatedShow.posterUrl == nil {
+                        updatedShow.posterUrl = existingShow.posterUrl
+                    }
+                    if updatedShow.backdropUrl == nil {
+                        updatedShow.backdropUrl = existingShow.backdropUrl
+                    }
+                    try updatedShow.update(db)
                     updatedShows += 1
                 } else {
+                    let show = traktShow.toShow()
                     try show.insert(db)
                     importedShows += 1
                 }
@@ -223,6 +231,52 @@ final class BatchSyncService {
                 updatedMovies: updatedMovies
             )
         }
+    }
+
+    // MARK: - Image Updates
+    
+    /// Update shows with missing images by re-fetching from Trakt with images
+    func updateMissingImages(progress: ((Int, Int) -> Void)? = nil) async throws {
+        guard let reader = databaseManager.reader,
+              let writer = databaseManager.writer else {
+            throw BatchSyncError.databaseNotInitialized
+        }
+        
+        // Get shows without poster URLs
+        let showsWithoutImages = try await reader.read { db in
+            try Show
+                .filter(Column("poster_url") == nil)
+                .fetchAll(db)
+        }
+        
+        print("🔍 Found \(showsWithoutImages.count) shows without poster URLs")
+        
+        var updatedCount = 0
+        
+        for (index, show) in showsWithoutImages.enumerated() {
+            progress?(index + 1, showsWithoutImages.count)
+            
+            do {
+                // Fetch show details from Trakt with images
+                let traktShow = try await traktService.getShow(id: String(show.traktId))
+                
+                
+                // Update show with image URLs from Trakt
+                try await writer.write { db in
+                    var updatedShow = traktShow.toShow()
+                    updatedShow.id = show.id
+                    try updatedShow.update(db)
+                }
+                
+                if traktShow.images?.poster != nil {
+                    updatedCount += 1
+                }
+            } catch {
+                print("❌ Failed to fetch images for \(show.title): \(error)")
+            }
+        }
+        
+        print("✅ Updated images for \(updatedCount)/\(showsWithoutImages.count) shows")
     }
 
     // MARK: - Private Helpers

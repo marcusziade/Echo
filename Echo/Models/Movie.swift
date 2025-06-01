@@ -14,6 +14,9 @@ struct Movie: Codable {
     let tagline: String?
     var watchedAt: Date?
     let updatedAt: Date?
+    let posterUrl: String?
+    let backdropUrl: String?
+    let tmdbId: Int?
 
     enum Columns: String, ColumnExpression {
         case id
@@ -27,6 +30,9 @@ struct Movie: Codable {
         case tagline
         case watchedAt = "watched_at"
         case updatedAt = "updated_at"
+        case posterUrl = "poster_url"
+        case backdropUrl = "backdrop_url"
+        case tmdbId = "tmdb_id"
     }
 
     enum CodingKeys: String, CodingKey {
@@ -41,13 +47,17 @@ struct Movie: Codable {
         case tagline
         case watchedAt = "watched_at"
         case updatedAt = "updated_at"
+        case posterUrl = "poster_url"
+        case backdropUrl = "backdrop_url"
+        case tmdbId = "tmdb_id"
     }
 
     init(
         id: Int64? = nil, traktId: Int, title: String, year: Int? = nil,
         overview: String? = nil, runtime: Int? = nil, released: Date? = nil,
         certification: String? = nil, tagline: String? = nil,
-        watchedAt: Date? = nil, updatedAt: Date? = nil
+        watchedAt: Date? = nil, updatedAt: Date? = nil, posterUrl: String? = nil,
+        backdropUrl: String? = nil, tmdbId: Int? = nil
     ) {
         self.id = id
         self.traktId = traktId
@@ -60,6 +70,9 @@ struct Movie: Codable {
         self.tagline = tagline
         self.watchedAt = watchedAt
         self.updatedAt = updatedAt
+        self.posterUrl = posterUrl
+        self.backdropUrl = backdropUrl
+        self.tmdbId = tmdbId
     }
 }
 
@@ -83,6 +96,9 @@ extension Movie: FetchableRecord, PersistableRecord {
         container["tagline"] = tagline
         container["watched_at"] = watchedAt
         container["updated_at"] = updatedAt
+        container["poster_url"] = posterUrl
+        container["backdrop_url"] = backdropUrl
+        container["tmdb_id"] = tmdbId
     }
 
     // Tell GRDB that id is auto-generated
@@ -135,20 +151,3 @@ extension Movie {
     }
 }
 
-// MARK: - Conversion from Trakt Model
-extension TraktMovie {
-    /// Convert Trakt API movie to local database model
-    func toMovie() -> Movie {
-        return Movie(
-            traktId: ids.trakt,
-            title: title,
-            year: year,
-            overview: overview,
-            runtime: runtime,
-            released: released?.toDate(),
-            certification: nil,  // Not in TraktMovie model
-            tagline: nil,  // Not in TraktMovie model
-            updatedAt: updatedAt?.toDate()
-        )
-    }
-}

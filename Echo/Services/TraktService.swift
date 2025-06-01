@@ -7,6 +7,30 @@ final class TraktService {
 
     private init() {}
 
+    /// Get all shows the user has watched
+    func getAllWatchedShows() async throws -> [TraktShow] {
+        struct WatchedShow: Decodable {
+            let plays: Int
+            let lastWatchedAt: String?
+            let lastUpdatedAt: String?
+            let resetAt: String?
+            let show: TraktShow
+
+            enum CodingKeys: String, CodingKey {
+                case plays
+                case lastWatchedAt = "last_watched_at"
+                case lastUpdatedAt = "last_updated_at"
+                case resetAt = "reset_at"
+                case show
+            }
+        }
+
+        let endpoint = "/sync/watched/shows?extended=full,images"
+        let watchedShows = try await apiClient.get([WatchedShow].self, endpoint: endpoint)
+
+        return watchedShows.map { $0.show }
+    }
+
     // MARK: - Search
 
     /// Search for shows and movies
@@ -25,6 +49,7 @@ final class TraktService {
         endpoint +=
             "?query=\(query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query)"
         endpoint += "&limit=\(limit)"
+        endpoint += "&extended=full,images"
 
         return try await apiClient.get([TraktSearchResult].self, endpoint: endpoint)
     }
@@ -39,19 +64,19 @@ final class TraktService {
 
     /// Get detailed information about a show
     func getShow(id: String) async throws -> TraktShow {
-        let endpoint = "/shows/\(id)?extended=full"
+        let endpoint = "/shows/\(id)?extended=full,images"
         return try await apiClient.get(TraktShow.self, endpoint: endpoint)
     }
 
     /// Get all seasons for a show
     func getSeasons(showId: String) async throws -> [TraktSeason] {
-        let endpoint = "/shows/\(showId)/seasons?extended=full"
+        let endpoint = "/shows/\(showId)/seasons?extended=full,images"
         return try await apiClient.get([TraktSeason].self, endpoint: endpoint)
     }
 
     /// Get all episodes for a season
     func getEpisodes(showId: String, season: Int) async throws -> [TraktEpisode] {
-        let endpoint = "/shows/\(showId)/seasons/\(season)?extended=full"
+        let endpoint = "/shows/\(showId)/seasons/\(season)?extended=full,images"
 
         do {
             // The API returns an array of episodes directly, not a season object
@@ -67,7 +92,7 @@ final class TraktService {
 
     /// Get watched progress for a show
     func getShowProgress(showId: String) async throws -> TraktWatchedProgress {
-        let endpoint = "/shows/\(showId)/progress/watched"
+        let endpoint = "/shows/\(showId)/progress/watched?extended=full,images"
         return try await apiClient.get(TraktWatchedProgress.self, endpoint: endpoint)
     }
 
@@ -91,7 +116,7 @@ final class TraktService {
         if let type = type {
             endpoint += "/\(type.rawValue)"
         }
-        endpoint += "?limit=\(limit)"
+        endpoint += "?limit=\(limit)&extended=full,images"
 
         return try await apiClient.get([TraktHistoryItem].self, endpoint: endpoint)
     }
@@ -104,6 +129,7 @@ final class TraktService {
         if let type = type {
             endpoint += "/\(type.rawValue)"
         }
+        endpoint += "?extended=full,images"
 
         return try await apiClient.get([TraktSearchResult].self, endpoint: endpoint)
     }

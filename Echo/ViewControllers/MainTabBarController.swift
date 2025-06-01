@@ -9,10 +9,15 @@ final class MainTabBarController: UITabBarController {
     }
 
     private func setupViewControllers() {
-        let upNextVC = createPlaceholderViewController(
+        // Create the actual Home view controller
+        let homeVC = HomeViewController()
+        homeVC.tabBarItem = UITabBarItem(
             title: "Up Next",
-            systemImage: "play.circle.fill"
+            image: UIImage(systemName: "play.circle.fill"),
+            selectedImage: UIImage(systemName: "play.circle.fill")
         )
+        let homeNavVC = UINavigationController(rootViewController: homeVC)
+        homeNavVC.navigationBar.prefersLargeTitles = true
 
         let searchVC = createPlaceholderViewController(
             title: "Search",
@@ -40,9 +45,9 @@ final class MainTabBarController: UITabBarController {
             let testNavVC = UINavigationController(rootViewController: testVC)
             testNavVC.navigationBar.prefersLargeTitles = true
 
-            viewControllers = [upNextVC, searchVC, libraryVC, profileVC, testNavVC]
+            viewControllers = [homeNavVC, searchVC, libraryVC, profileVC, testNavVC]
         #else
-            viewControllers = [upNextVC, searchVC, libraryVC, profileVC]
+            viewControllers = [homeNavVC, searchVC, libraryVC, profileVC]
         #endif
     }
 

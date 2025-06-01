@@ -134,6 +134,85 @@ final class DatabaseObservationService {
             .publisher(in: reader, scheduling: .async(onQueue: .main))
             .eraseToAnyPublisher()
     }
+    
+    /// Get a single batch of up next episodes (for non-observing pagination)
+    func getUpNextBatch(offset: Int, limit: Int) async throws -> [UpNextItem] {
+        guard let reader = databaseManager.reader else {
+            throw DatabaseObservationError.databaseNotInitialized
+        }
+        
+        return try await reader.read { db -> [UpNextItem] in
+            // Get all shows
+            let shows = try Show.fetchAll(db)
+            
+            var allUpNextItems: [UpNextItem] = []
+            
+            for show in shows {
+                guard let showId = show.id else { continue }
+
+                // Find next episode to watch inline
+                let unwatchedEpisodes =
+                    try Episode
+                    .filter(Column("show_id") == showId)
+                    .filter(Column("watched_at") == nil)
+                    .filter(Column("aired_at") != nil)
+                    .filter(Column("aired_at") <= Date())
+                    .order(Column("season"), Column("number"))
+                    .fetchAll(db)
+
+                guard !unwatchedEpisodes.isEmpty else { continue }
+
+                let lastWatchedEpisode =
+                    try Episode
+                    .filter(Column("show_id") == showId)
+                    .filter(Column("watched_at") != nil)
+                    .order(Column("season").desc, Column("number").desc)
+                    .fetchOne(db)
+
+                var nextEpisode: Episode?
+
+                if let lastWatched = lastWatchedEpisode {
+                    // Find first unwatched after last watched
+                    nextEpisode =
+                        unwatchedEpisodes.first { episode in
+                            episode.season > lastWatched.season
+                                || (episode.season == lastWatched.season
+                                    && episode.number > lastWatched.number)
+                        } ?? unwatchedEpisodes.first
+                } else {
+                    // Nothing watched yet, return first episode
+                    nextEpisode = unwatchedEpisodes.first
+                }
+
+                if let nextEpisode = nextEpisode {
+                    let progress = try WatchedProgress.calculateForShow(showId: showId, in: db)
+
+                    allUpNextItems.append(
+                        UpNextItem(
+                            show: show,
+                            nextEpisode: nextEpisode,
+                            progress: progress
+                        ))
+                }
+            }
+            
+            // Sort by air date
+            let sortedItems = allUpNextItems.sorted { item1, item2 in
+                guard let date1 = item1.nextEpisode.airedAt,
+                    let date2 = item2.nextEpisode.airedAt
+                else {
+                    return false
+                }
+                return date1 < date2
+            }
+            
+            // Apply pagination
+            let startIndex = min(offset, sortedItems.count)
+            let endIndex = min(offset + limit, sortedItems.count)
+            
+            return Array(sortedItems[startIndex..<endIndex])
+        }
+    }
 
     /// Observe watched progress for a show
     func observeProgress(showId: Int64) -> AnyPublisher<WatchedProgress?, Error> {
