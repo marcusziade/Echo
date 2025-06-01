@@ -112,12 +112,10 @@ final class HomeViewController: UIViewController {
             action: #selector(syncButtonTapped)
         )
         
-        // Add sort button
+        // Add sort button with menu
         let sortButton = UIBarButtonItem(
             image: UIImage(systemName: viewModel.sortOption.icon),
-            style: .plain,
-            target: self,
-            action: #selector(sortButtonTapped)
+            menu: createSortMenu()
         )
         
         navigationItem.rightBarButtonItems = [syncButton, sortButton]
@@ -258,7 +256,10 @@ final class HomeViewController: UIViewController {
         viewModel.$sortOption
             .receive(on: DispatchQueue.main)
             .sink { [weak self] sortOption in
-                self?.navigationItem.rightBarButtonItems?.last?.image = UIImage(systemName: sortOption.icon)
+                if let sortButton = self?.navigationItem.rightBarButtonItems?.last {
+                    sortButton.image = UIImage(systemName: sortOption.icon)
+                    sortButton.menu = self?.createSortMenu()
+                }
                 self?.updateSnapshot()
             }
             .store(in: &cancellables)
@@ -422,37 +423,18 @@ final class HomeViewController: UIViewController {
         }
     }
     
-    @objc private func sortButtonTapped() {
-        let alertController = UIAlertController(
-            title: "Sort By",
-            message: nil,
-            preferredStyle: .actionSheet
-        )
-        
-        for option in SortOption.allCases {
-            let action = UIAlertAction(
+    private func createSortMenu() -> UIMenu {
+        let actions = SortOption.allCases.map { option in
+            UIAction(
                 title: option.rawValue,
-                style: .default,
-                handler: { [weak self] _ in
-                    self?.viewModel.updateSortOption(option)
-                }
-            )
-            
-            if option == viewModel.sortOption {
-                action.setValue(true, forKey: "checked")
+                image: UIImage(systemName: option.icon),
+                state: option == viewModel.sortOption ? .on : .off
+            ) { [weak self] _ in
+                self?.viewModel.updateSortOption(option)
             }
-            
-            alertController.addAction(action)
         }
         
-        alertController.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        // For iPad
-        if let popover = alertController.popoverPresentationController {
-            popover.barButtonItem = navigationItem.rightBarButtonItems?.last
-        }
-        
-        present(alertController, animated: true)
+        return UIMenu(title: "Sort By", children: actions)
     }
 }
 
