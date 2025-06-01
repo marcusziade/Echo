@@ -1,3 +1,5 @@
+import Combine
+import GRDB
 import UIKit
 
 /// Test view controller for verifying Trakt API integration
@@ -6,6 +8,7 @@ final class TraktTestViewController: UIViewController {
     // MARK: - UI Elements
     private let scrollView = UIScrollView()
     private let contentView = UIView()
+    private var cancellables = Set<AnyCancellable>()
 
     private let testSearchButton: UIButton = {
         let button = UIButton(type: .system)
@@ -47,6 +50,26 @@ final class TraktTestViewController: UIViewController {
         return button
     }()
 
+    private let testObservationsButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Test Database Observations", for: .normal)
+        button.backgroundColor = .systemIndigo
+        button.setTitleColor(.white, for: .normal)
+        button.layer.cornerRadius = 8
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
+    private let testBatchButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("Test Batch Operations", for: .normal)
+        button.backgroundColor = .systemTeal
+        button.setTitleColor(.white, for: .normal)
+        button.layer.cornerRadius = 8
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+
     private let outputTextView: UITextView = {
         let textView = UITextView()
         textView.isEditable = false
@@ -80,6 +103,8 @@ final class TraktTestViewController: UIViewController {
         contentView.addSubview(testTokenButton)
         contentView.addSubview(testDatabaseButton)
         contentView.addSubview(testSyncButton)
+        contentView.addSubview(testObservationsButton)
+        contentView.addSubview(testBatchButton)
         contentView.addSubview(outputTextView)
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(
@@ -133,8 +158,24 @@ final class TraktTestViewController: UIViewController {
                 equalTo: contentView.trailingAnchor, constant: -20),
             testSyncButton.heightAnchor.constraint(equalToConstant: 44),
 
+            testObservationsButton.topAnchor.constraint(
+                equalTo: testSyncButton.bottomAnchor, constant: 12),
+            testObservationsButton.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            testObservationsButton.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
+            testObservationsButton.heightAnchor.constraint(equalToConstant: 44),
+
+            testBatchButton.topAnchor.constraint(
+                equalTo: testObservationsButton.bottomAnchor, constant: 12),
+            testBatchButton.leadingAnchor.constraint(
+                equalTo: contentView.leadingAnchor, constant: 20),
+            testBatchButton.trailingAnchor.constraint(
+                equalTo: contentView.trailingAnchor, constant: -20),
+            testBatchButton.heightAnchor.constraint(equalToConstant: 44),
+
             outputTextView.topAnchor.constraint(
-                equalTo: testSyncButton.bottomAnchor, constant: 20),
+                equalTo: testBatchButton.bottomAnchor, constant: 20),
             outputTextView.leadingAnchor.constraint(
                 equalTo: contentView.leadingAnchor, constant: 20),
             outputTextView.trailingAnchor.constraint(
@@ -150,9 +191,12 @@ final class TraktTestViewController: UIViewController {
         testTokenButton.addTarget(self, action: #selector(testToken), for: .touchUpInside)
         testDatabaseButton.addTarget(self, action: #selector(testDatabase), for: .touchUpInside)
         testSyncButton.addTarget(self, action: #selector(testSync), for: .touchUpInside)
+        testObservationsButton.addTarget(
+            self, action: #selector(testObservations), for: .touchUpInside)
+        testBatchButton.addTarget(self, action: #selector(testBatchOperations), for: .touchUpInside)
     }
 
-    // MARK: - Actions
+    // MARK: - Original Test Actions
     @objc private func testSearch() {
         appendOutput("🔍 Testing Search with Sync Manager...\n")
 
@@ -296,7 +340,8 @@ final class TraktTestViewController: UIViewController {
                 }
 
                 // Sync the complete show
-                let syncedShow = try await SyncManager.shared.syncCompleteShow(showId: firstShow.id!)
+                let syncedShow = try await SyncManager.shared.syncCompleteShow(
+                    showId: firstShow.id!)
 
                 // Get sync stats
                 let stats = try await SyncManager.shared.getSyncStats(for: syncedShow.id!)
@@ -308,7 +353,8 @@ final class TraktTestViewController: UIViewController {
                     appendOutput("  Aired Episodes: \(stats.airedEpisodes)\n")
                     appendOutput("  Watched Episodes: \(stats.watchedEpisodes)\n")
                     appendOutput("  Unwatched (Aired): \(stats.unwatchedAired)\n")
-                    appendOutput("  Watched %: \(String(format: "%.1f", stats.watchedPercentage))%\n")
+                    appendOutput(
+                        "  Watched %: \(String(format: "%.1f", stats.watchedPercentage))%\n")
                 }
 
                 // Now sync watched progress
@@ -325,34 +371,229 @@ final class TraktTestViewController: UIViewController {
                     appendOutput("✅ Watched progress synced!\n")
                     appendOutput("\n📊 Updated Statistics:\n")
                     appendOutput("  Watched Episodes: \(updatedStats.watchedEpisodes)\n")
-                    appendOutput("  Watched %: \(String(format: "%.1f", updatedStats.watchedPercentage))%\n")
+                    appendOutput(
+                        "  Watched %: \(String(format: "%.1f", updatedStats.watchedPercentage))%\n")
                 }
 
-            } catch DecodingError.keyNotFound(let key, let context) {
-                await MainActor.run {
-                    appendOutput("❌ Decoding error - Missing key: \(key)\n")
-                    appendOutput("   Context: \(context.debugDescription)\n")
-                }
-            } catch DecodingError.typeMismatch(let type, let context) {
-                await MainActor.run {
-                    appendOutput("❌ Decoding error - Type mismatch: \(type)\n")
-                    appendOutput("   Context: \(context.debugDescription)\n")
-                }
-            } catch DecodingError.valueNotFound(let type, let context) {
-                await MainActor.run {
-                    appendOutput("❌ Decoding error - Value not found: \(type)\n")
-                    appendOutput("   Context: \(context.debugDescription)\n")
-                }
-            } catch DecodingError.dataCorrupted(let context) {
-                await MainActor.run {
-                    appendOutput("❌ Decoding error - Data corrupted\n")
-                    appendOutput("   Context: \(context.debugDescription)\n")
-                }
             } catch {
                 await MainActor.run {
                     appendOutput("❌ Sync failed: \(error.localizedDescription)\n")
-                    appendOutput("   Error type: \(type(of: error))\n")
-                    appendOutput("   Error details: \(error)\n")
+                }
+            }
+        }
+    }
+
+    // MARK: - New Test Actions
+
+    @objc private func testObservations() {
+        appendOutput("👀 Testing Database Observations...\n")
+
+        // Cancel existing subscriptions
+        cancellables.removeAll()
+
+        // Check if database has data
+        do {
+            guard let db = DatabaseManager.shared.reader else {
+                appendOutput("❌ Database not initialized\n")
+                return
+            }
+
+            let showCount = try db.read { db in
+                try Show.fetchCount(db)
+            }
+
+            if showCount == 0 {
+                appendOutput(
+                    "\n⚠️ Database is empty! Run 'Test Search API' first to add some shows.\n")
+            }
+        } catch {
+            appendOutput("❌ Failed to check database: \(error)\n")
+        }
+
+        // Test 1: Observe shows
+        appendOutput("\n1️⃣ Setting up show observation...\n")
+        DatabaseObservationService.shared.observeShows()
+            .sink(
+                receiveCompletion: { completion in
+                    if case .failure(let error) = completion {
+                        self.appendOutput("❌ Show observation failed: \(error)\n")
+                    }
+                },
+                receiveValue: { shows in
+                    self.appendOutput("📺 Shows updated: \(shows.count) shows\n")
+                    for show in shows.prefix(3) {
+                        self.appendOutput("  - \(show.title)\n")
+                    }
+                }
+            )
+            .store(in: &cancellables)
+
+        // Test 2: Observe statistics
+        appendOutput("\n2️⃣ Setting up statistics observation...\n")
+        DatabaseObservationService.shared.observeStatistics()
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { stats in
+                    self.appendOutput("📊 Database Statistics:\n")
+                    self.appendOutput("  Shows: \(stats.totalShows)\n")
+                    self.appendOutput(
+                        "  Episodes: \(stats.totalEpisodes) (Watched: \(stats.watchedEpisodes))\n")
+                    self.appendOutput(
+                        "  Movies: \(stats.totalMovies) (Watched: \(stats.watchedMovies))\n")
+                    self.appendOutput(
+                        "  Episode Progress: \(String(format: "%.1f", stats.episodeWatchedPercentage))%\n"
+                    )
+                }
+            )
+            .store(in: &cancellables)
+
+        // Test 3: Observe Up Next
+        appendOutput("\n3️⃣ Setting up Up Next observation...\n")
+        DatabaseObservationService.shared.observeUpNextEpisodes()
+            .sink(
+                receiveCompletion: { _ in },
+                receiveValue: { upNextItems in
+                    self.appendOutput("🎬 Up Next: \(upNextItems.count) items\n")
+                    for item in upNextItems.prefix(5) {
+                        self.appendOutput(
+                            "  - \(item.show.title) S\(item.nextEpisode.season)E\(item.nextEpisode.number)"
+                        )
+                        if let title = item.nextEpisode.title {
+                            self.appendOutput(": \(title)")
+                        }
+                        self.appendOutput("\n")
+                    }
+                }
+            )
+            .store(in: &cancellables)
+
+        appendOutput("\n✅ Observations set up! Make database changes to see updates.\n")
+        appendOutput("💡 Try running other tests to see live updates!\n")
+    }
+
+    @objc private func testBatchOperations() {
+        appendOutput("🔄 Testing Batch Operations...\n")
+
+        Task {
+            do {
+                // Test 1: Import search results
+                appendOutput("\n1️⃣ Testing batch import from search...\n")
+
+                let searchResults = try await TraktService.shared.search(
+                    query: "Game of Thrones",
+                    limit: 5
+                )
+
+                let importResult = try await BatchSyncService.shared.importSearchResults(
+                    searchResults)
+
+                await MainActor.run {
+                    appendOutput("✅ Batch Import Results:\n")
+                    appendOutput("  New Shows: \(importResult.importedShows)\n")
+                    appendOutput("  Updated Shows: \(importResult.updatedShows)\n")
+                    appendOutput("  New Movies: \(importResult.importedMovies)\n")
+                    appendOutput("  Updated Movies: \(importResult.updatedMovies)\n")
+                    appendOutput("  Total Processed: \(importResult.totalProcessed)\n")
+                }
+
+                // Test 2: Batch sync multiple shows
+                appendOutput("\n2️⃣ Testing batch sync of multiple shows...\n")
+
+                guard let db = DatabaseManager.shared.reader else {
+                    await MainActor.run {
+                        appendOutput("❌ Database not initialized\n")
+                    }
+                    return
+                }
+
+                let showIds = try await db.read { db in
+                    try Show.fetchAll(db).prefix(2).compactMap { $0.id }
+                }
+
+                if showIds.isEmpty {
+                    await MainActor.run {
+                        appendOutput("⚠️ No shows to sync. Skipping batch sync test.\n")
+                        appendOutput("💡 Run 'Test Search API' first to add shows.\n")
+                    }
+                } else {
+                    await MainActor.run {
+                        appendOutput("🔄 Syncing \(showIds.count) shows...\n")
+                    }
+
+                    let batchResult = try await BatchSyncService.shared.syncMultipleShows(
+                        showIds: showIds
+                    ) { progress in
+                        Task { @MainActor in
+                            self.appendOutput(
+                                "  Progress: \(progress.current)/\(progress.total) - \(progress.phase.description)\n"
+                            )
+                        }
+                    }
+
+                    await MainActor.run {
+                        appendOutput("\n✅ Batch Sync Results:\n")
+                        appendOutput(
+                            "  Success: \(batchResult.successCount)/\(batchResult.totalShows)\n")
+                        appendOutput("  Failed: \(batchResult.failureCount)\n")
+                        appendOutput("  Episodes Synced: \(batchResult.totalEpisodesSynced)\n")
+                        appendOutput(
+                            "  Success Rate: \(String(format: "%.1f", batchResult.successRate))%\n")
+
+                        if !batchResult.failedShows.isEmpty {
+                            appendOutput("\n❌ Failed Shows:\n")
+                            for (showId, error) in batchResult.failedShows {
+                                appendOutput("  Show ID \(showId): \(error.localizedDescription)\n")
+                            }
+                        }
+                    }
+                }
+
+                // Test 3: Transaction test
+                appendOutput("\n3️⃣ Testing transaction support...\n")
+
+                let transactionResult = try await BatchSyncService.shared.performInTransaction {
+                    db in
+                    // Count episodes before
+                    let countBefore = try Episode.fetchCount(db)
+
+                    // Create a test episode
+                    let shows = try Show.fetchAll(db)
+                    if let firstShow = shows.first, let showId = firstShow.id {
+                        var testEpisode = Episode(
+                            showId: showId,
+                            traktId: 999999,
+                            season: 99,
+                            number: 99,
+                            title: "Test Episode (Transaction Test)"
+                        )
+                        try testEpisode.insert(db)
+
+                        // Count after insert
+                        let countAfter = try Episode.fetchCount(db)
+
+                        // Delete the test episode to clean up
+                        _ = try Episode.filter(Column("trakt_id") == 999999).deleteAll(db)
+
+                        return (before: countBefore, after: countAfter, created: true)
+                    } else {
+                        return (before: countBefore, after: countBefore, created: false)
+                    }
+                }
+
+                await MainActor.run {
+                    appendOutput("✅ Transaction completed:\n")
+                    appendOutput("  Episodes before: \(transactionResult.before)\n")
+                    appendOutput("  Episodes after insert: \(transactionResult.after)\n")
+                    if transactionResult.created {
+                        appendOutput("  Successfully created and cleaned up test episode!\n")
+                    } else {
+                        appendOutput("  No shows available for testing, but transaction worked!\n")
+                    }
+                }
+
+            } catch {
+                await MainActor.run {
+                    appendOutput("❌ Batch operation failed: \(error.localizedDescription)\n")
                 }
             }
         }
@@ -360,6 +601,7 @@ final class TraktTestViewController: UIViewController {
 
     @objc private func clearOutput() {
         outputTextView.text = ""
+        cancellables.removeAll()
     }
 
     // MARK: - Helpers
