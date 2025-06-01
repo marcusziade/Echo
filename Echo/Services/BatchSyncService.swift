@@ -24,7 +24,7 @@ final class BatchSyncService {
     ) async throws -> BatchSyncResult {
         return try await syncMultipleShowsConcurrently(
             showIds: showIds,
-            maxConcurrency: 16,
+            maxConcurrency: ProcessInfo.processInfo.activeProcessorCount,
             progress: progress
         )
     }
@@ -32,13 +32,13 @@ final class BatchSyncService {
     /// Sync multiple shows concurrently with limited concurrency
     /// - Parameters:
     ///   - showIds: Array of show database IDs to sync
-    ///   - maxConcurrency: Maximum number of concurrent operations (default 16)
+    ///   - maxConcurrency: Maximum number of concurrent operations (defaults to processor count)
     ///   - progress: Progress callback (called after each show)
     /// - Returns: Results of the batch operation
     @discardableResult
     func syncMultipleShowsConcurrently(
         showIds: [Int64],
-        maxConcurrency: Int = 16,
+        maxConcurrency: Int = ProcessInfo.processInfo.activeProcessorCount,
         progress: ((BatchSyncProgress) -> Void)? = nil
     ) async throws -> BatchSyncResult {
         
