@@ -559,7 +559,7 @@ final class TraktTestViewController: UIViewController {
                     // Create a test episode
                     let shows = try Show.fetchAll(db)
                     if let firstShow = shows.first, let showId = firstShow.id {
-                        var testEpisode = Episode(
+                        let testEpisode = Episode(
                             showId: showId,
                             traktId: 999999,
                             season: 99,
