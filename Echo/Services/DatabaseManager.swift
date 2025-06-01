@@ -222,7 +222,7 @@ final class DatabaseManager {
     // MARK: - Movie Tests
     private func testMovies(in db: Database) throws {
         // Create test movies
-        var movie1 = Movie(
+        let movie1 = Movie(
             traktId: 120,
             title: "The Lord of the Rings: The Fellowship of the Ring",
             year: 2001,
@@ -235,7 +235,7 @@ final class DatabaseManager {
             watchedAt: Date()  // Marked as watched
         )
 
-        var movie2 = Movie(
+        let movie2 = Movie(
             traktId: 121,
             title: "The Lord of the Rings: The Two Towers",
             year: 2002,
